@@ -1,13 +1,14 @@
 import { View, Text, FlatList, Pressable, ActivityIndicator } from 'react-native';
-import { useEffect, useState } from 'react';
-import { api } from '../services/api';
-import { removeToken } from '../services/auth';
-import { useNavigation } from '@react-navigation/native';
-import { logout as apiLogout } from '../services/auth';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+
+import { auth, db } from '../../firebase';
 import { useAuth } from '../context/AuthContext';
 
 type Routine = {
-  id: number;
+  id: string;
   name: string;
   description?: string;
   level: string;
@@ -17,30 +18,44 @@ export default function HomeScreen() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<any>();
-const { logout: setLogout } = useAuth();
+  const { logout } = useAuth();
 
   const loadRoutines = async () => {
+    if (!auth.currentUser) return;
+
     try {
-      const res = await api.get('/routines');
-      setRoutines(res.data);
-      setLoading(false);
-    } catch (e) {
-      console.log(e);
+      setLoading(true);
+
+      const q = query(
+        collection(db, 'routines'),
+        where('userId', '==', auth.currentUser.uid)
+      );
+
+      const snapshot = await getDocs(q);
+
+      const data: Routine[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...(doc.data() as Omit<Routine, 'id'>),
+      }));
+
+      setRoutines(data);
+    } catch (error) {
+      console.log('Error cargando rutinas:', error);
     } finally {
       setLoading(false);
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      loadRoutines();
+    }, [])
+  );
+
   const handleLogout = async () => {
-  await apiLogout();     // backend + storage
-  setLogout();           // estado global
-};
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', loadRoutines);
-    return unsubscribe;
-  }, []);
-
+    await signOut(auth);
+    logout(); // limpia estado global
+  };
 
   if (loading) {
     return <ActivityIndicator style={{ marginTop: 50 }} />;
@@ -48,6 +63,7 @@ const { logout: setLogout } = useAuth();
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f9f9f9', padding: 16 }}>
+      {/* Crear rutina */}
       <Pressable
         onPress={() => navigation.navigate('CreateRoutine')}
         style={{
@@ -62,16 +78,25 @@ const { logout: setLogout } = useAuth();
           + Nueva Rutina
         </Text>
       </Pressable>
+
       <Text style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>
         Mis Rutinas 💪
       </Text>
 
+      {/* Lista de rutinas */}
       <FlatList
         data={routines}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={
+          <Text style={{ color: '#666', textAlign: 'center', marginTop: 40 }}>
+            Aún no tienes rutinas creadas
+          </Text>
+        }
         renderItem={({ item }) => (
           <Pressable
-            onPress={() => navigation.navigate('RoutineDetail', { routine: item })}
+            onPress={() =>
+              navigation.navigate('RoutineDetail', { routineId: item.id })
+            }
             style={{
               backgroundColor: '#fff',
               padding: 16,
@@ -79,8 +104,16 @@ const { logout: setLogout } = useAuth();
               marginBottom: 12,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>{item.name}</Text>
-            <Text style={{ color: '#666' }}>{item.description}</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
+              {item.name}
+            </Text>
+
+            {item.description ? (
+              <Text style={{ color: '#666', marginTop: 4 }}>
+                {item.description}
+              </Text>
+            ) : null}
+
             <Text style={{ marginTop: 8, fontStyle: 'italic' }}>
               Nivel: {item.level}
             </Text>
@@ -88,6 +121,7 @@ const { logout: setLogout } = useAuth();
         )}
       />
 
+      {/* Logout */}
       <Pressable
         onPress={handleLogout}
         style={{

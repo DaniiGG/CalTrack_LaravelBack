@@ -1,24 +1,14 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from './api';
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 
-export const saveToken = async (token: string) => {
-  await AsyncStorage.setItem('token', token);
-};
+const firebaseConfig = { 
+    apiKey: "AIzaSyB7pXAQrQK3ngZNHt-Us3mDvnM7FyieAiE",
+  authDomain: "caltrack-37bd0.firebaseapp.com",
+  projectId: "caltrack-37bd0",
+  storageBucket: "caltrack-37bd0.firebasestorage.app",
+  messagingSenderId: "47749169922",
+  appId: "1:47749169922:web:4a2f46014104f711c5781b"
+ };
 
-export const getToken = async () => {
-  return await AsyncStorage.getItem('token');
-};
-
-export const removeToken = async () => {
-  await AsyncStorage.removeItem('token');
-};
-
-export const logout = async () => {
-  try {
-    await api.post('/logout');
-  } catch (e) {
-    // aunque falle backend, seguimos limpiando
-  } finally {
-    await AsyncStorage.removeItem('token');
-  }
-};
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);

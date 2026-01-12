@@ -1,30 +1,48 @@
 import { View, Text, TextInput, Pressable, Alert } from 'react-native';
 import { useState } from 'react';
-import { api } from '../services/api';
 import { useNavigation } from '@react-navigation/native';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { auth, db } from '../../firebase';
 
 export default function CreateRoutineScreen() {
   const navigation = useNavigation<any>();
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState('');
 
   const createRoutine = async () => {
-    if (!name || !level) {
+    if (!name.trim() || !level.trim()) {
       Alert.alert('Error', 'Nombre y nivel son obligatorios');
       return;
     }
 
+    if (!auth.currentUser) {
+      Alert.alert('Error', 'Usuario no autenticado');
+      return;
+    }
+
     try {
-      await api.post('/routines', {
-        name,
-        description,
-        level,
+      await addDoc(collection(db, 'routines'), {
+        userId: auth.currentUser.uid,
+        name: name.trim(),
+        description: description.trim(),
+        level: level.trim().toLowerCase(), // beginner | intermediate | advanced
+        createdAt: serverTimestamp(),
       });
 
-      Alert.alert('Rutina creada');
-      navigation.goBack();
-    } catch (e) {
+     Alert.alert(
+  'Rutina creada',
+  'Se ha guardado correctamente',
+  [
+    {
+      text: 'OK',
+      onPress: () => navigation.goBack(),
+    },
+  ]
+);
+    } catch (error) {
+      console.log(error);
       Alert.alert('Error al crear rutina');
     }
   };
@@ -48,7 +66,7 @@ export default function CreateRoutineScreen() {
       />
 
       <TextInput
-        placeholder="Descripción"
+        placeholder="Descripción (opcional)"
         value={description}
         onChangeText={setDescription}
         style={{
@@ -63,6 +81,7 @@ export default function CreateRoutineScreen() {
         placeholder="Nivel (beginner / intermediate / advanced)"
         value={level}
         onChangeText={setLevel}
+        autoCapitalize="none"
         style={{
           backgroundColor: '#fff',
           padding: 14,

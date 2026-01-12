@@ -7,6 +7,7 @@ import CreateRoutineScreen from '../screens/CreateRoutineScreen';
 import RoutineDetailScreen from '../screens/RoutineDetailScreen';
 import WorkoutScreen from '../screens/WorkoutScreen';
 import WorkoutFocusScreen from '../screens/WorkoutFocusScreen';
+import SignUpScreen from '../screens/SignUpScreen';
 
 const Stack = createNativeStackNavigator();
 

@@ -3,11 +3,16 @@ import {
   Text,
   FlatList,
   Pressable,
+  Modal,
   TextInput,
-  Image,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useEffect, useState } from 'react';
-import { api } from '../services/api';
+import { collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../../firebase';
 import { useRoute, useNavigation } from '@react-navigation/native';
 
 export default function AddRoutineExerciseScreen() {
@@ -16,89 +21,148 @@ export default function AddRoutineExerciseScreen() {
   const routineId = route.params.routineId;
 
   const [exercises, setExercises] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [showCustomModal, setShowCustomModal] = useState(false);
+
   const [sets, setSets] = useState('3');
   const [reps, setReps] = useState('10');
   const [rest, setRest] = useState('60');
 
+  const [search, setSearch] = useState('');
+
+  const [custom, setCustom] = useState({
+    name: '',
+    description: '',
+    muscle_group: '',
+    equipment: '',
+    difficulty: 'beginner',
+  });
+
   useEffect(() => {
-    api.get('/exercises').then(res => setExercises(res.data));
+    const loadExercises = async () => {
+      const snapshot = await getDocs(collection(db, 'exercises'));
+      setExercises(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    };
+    loadExercises();
   }, []);
 
-  const addExercise = async () => {
-     if (!selected) return;
-    await api.post(`/routines/${routineId}/exercises`, {
-      exercise_id: selected.id,
-      sets: Number(sets),
-      reps: Number(reps),
-      rest_seconds: Number(rest),
+  const addGlobalExercise = async (exerciseId: string) => {
+    await updateDoc(doc(db, 'routines', routineId), {
+      exercises: arrayUnion({
+        type: 'global',
+        exerciseId,
+        sets: Number(sets),
+        reps: Number(reps),
+        rest_seconds: Number(rest),
+      }),
+    });
+    navigation.goBack();
+  };
+
+  const addCustomExercise = async () => {
+    if (!custom.name) {
+      Alert.alert('Nombre obligatorio');
+      return;
+    }
+
+    await updateDoc(doc(db, 'routines', routineId), {
+      exercises: arrayUnion({
+        type: 'custom',
+        ...custom,
+        sets: Number(sets),
+        reps: Number(reps),
+        rest_seconds: Number(rest),
+      }),
     });
 
     navigation.goBack();
   };
 
-  if (selected) {
-    return (
-      <View style={{ padding: 20 }}>
-        <Text style={{ fontSize: 22, fontWeight: 'bold' }}>
-          {selected.name}
-        </Text>
+  if (loading) return <ActivityIndicator style={{ marginTop: 50 }} />;
 
-        <TextInput
-          placeholder="Series"
-          value={sets + ' Series'}
-          onChangeText={setSets}
-          keyboardType="numeric"
-        />
-
-        <TextInput
-          placeholder="Reps"
-          value={reps + ' Reps'}
-          onChangeText={setReps}
-          keyboardType="numeric"
-        />
-
-        <TextInput
-          placeholder="Descanso (seg)"
-          value={rest + ' Seg Descanso'}
-          onChangeText={setRest}
-          keyboardType="numeric"
-        />
-
-        <Pressable
-  onPress={addExercise}
-  disabled={!selected}
-  style={{
-    backgroundColor: selected ? '#111' : '#999',
-    padding: 14,
-    marginTop: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-  }}
->
-  <Text style={{ color: '#fff' }}>Guardar</Text>
-</Pressable>
-      </View>
-    );
-  }
+  const filteredExercises = exercises.filter(e =>
+    e.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <FlatList
-      data={exercises}
-      keyExtractor={item => item.id.toString()}
-      renderItem={({ item }) => (
+    <View style={{ flex: 1 }}>
+      <TextInput
+        placeholder="Buscar ejercicio"
+        value={search}
+        onChangeText={setSearch}
+        style={{
+          marginHorizontal: 16,
+          padding: 10,
+          borderWidth: 1,
+          borderColor: '#ddd',
+          borderRadius: 8,
+        }}
+      />
+      {filteredExercises.length === 0 && (
         <Pressable
-          onPress={() => setSelected(item)}
+          onPress={() => setShowCustomModal(true)}
           style={{
-            padding: 16,
-            borderBottomWidth: 1,
-            borderColor: '#ddd',
+            backgroundColor: '#111',
+            padding: 14,
+            margin: 16,
+            borderRadius: 8,
+            alignItems: 'center',
           }}
         >
-          <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
-          <Text>{item.muscle_group}</Text>
+          <Text style={{ color: '#fff' }}>
+            + Crear ejercicio personalizado
+          </Text>
         </Pressable>
       )}
-    />
+
+      <FlatList
+        data={filteredExercises}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() => addGlobalExercise(item.id)}
+            style={{
+              padding: 16,
+              borderBottomWidth: 1,
+              borderColor: '#ddd',
+            }}
+          >
+            <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
+            <Text style={{ color: '#666' }}>{item.muscle_group}</Text>
+          </Pressable>
+        )}
+      />
+
+      {/* 🔥 MODAL EJERCICIO PERSONALIZADO */}
+      <Modal visible={showCustomModal} animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, padding: 20 }}
+        >
+          <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 12 }}>
+            Ejercicio personalizado
+          </Text>
+
+          <TextInput placeholder="Nombre" onChangeText={t => setCustom(p => ({ ...p, name: t }))} />
+          <TextInput placeholder="Descripción" onChangeText={t => setCustom(p => ({ ...p, description: t }))} />
+          <TextInput placeholder="Grupo muscular" onChangeText={t => setCustom(p => ({ ...p, muscle_group: t }))} />
+          <TextInput placeholder="Equipo" onChangeText={t => setCustom(p => ({ ...p, equipment: t }))} />
+
+          <TextInput placeholder="Series" value={sets} onChangeText={setSets} keyboardType="numeric" />
+          <TextInput placeholder="Reps" value={reps} onChangeText={setReps} keyboardType="numeric" />
+          <TextInput placeholder="Descanso (s)" value={rest} onChangeText={setRest} keyboardType="numeric" />
+
+          <Pressable onPress={addCustomExercise} style={{ backgroundColor: '#0a7', padding: 14 }}>
+            <Text style={{ color: '#fff', textAlign: 'center' }}>Guardar</Text>
+          </Pressable>
+
+          <Pressable onPress={() => setShowCustomModal(false)}>
+            <Text style={{ textAlign: 'center', marginTop: 10 }}>Cancelar</Text>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   );
 }

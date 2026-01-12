@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   Animated,
-} from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+  StyleSheet
+} from "react-native";
+import { useRoute, useNavigation } from "@react-navigation/native";
 
-type Phase = 'set' | 'rest';
+type Phase = "set" | "rest";
 
 export default function WorkoutFocusScreen() {
   const route = useRoute<any>();
@@ -16,17 +17,25 @@ export default function WorkoutFocusScreen() {
 
   if (!routine) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Rutina no encontrada</Text>
+      <View style={styles.center}>
+        <Text style={styles.textMuted}>Routine not found</Text>
       </View>
     );
   }
 
-  const exercises = routine.exercises;
+  const exercises = routine.exercises ?? [];
+
+  if (!exercises.length) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.textMuted}>No exercises</Text>
+      </View>
+    );
+  }
 
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [currentSet, setCurrentSet] = useState(1);
-  const [phase, setPhase] = useState<Phase>('set');
+  const [phase, setPhase] = useState<Phase>("set");
   const [timer, setTimer] = useState(0);
   const [finished, setFinished] = useState(false);
 
@@ -34,13 +43,16 @@ export default function WorkoutFocusScreen() {
   const finishAnim = useRef(new Animated.Value(0)).current;
 
   const currentExercise = exercises[exerciseIndex];
-
   const totalSets = currentExercise.sets;
   const repsTarget = currentExercise.reps;
   const restRecommended = currentExercise.rest_seconds ?? 60;
-  const exerciseName = currentExercise.exercise.name;
 
-  // ⏱️ Timer universal (set y descanso)
+  const exerciseName =
+    currentExercise.exercise?.name ??
+    currentExercise.name ??
+    "Exercise";
+
+  // TIMER
   useEffect(() => {
     startTime.current = Date.now();
     setTimer(0);
@@ -54,26 +66,21 @@ export default function WorkoutFocusScreen() {
 
   const completeSet = () => {
     if (currentSet < totalSets) {
-      setPhase('rest');
+      setPhase("rest");
     } else {
-      // Último set del ejercicio
       if (exerciseIndex < exercises.length - 1) {
         setExerciseIndex(prev => prev + 1);
         setCurrentSet(1);
-        setPhase('set');
+        setPhase("set");
       } else {
-        // 🏁 FIN DE RUTINA
         setFinished(true);
-
         Animated.timing(finishAnim, {
           toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
+          duration: 500,
+          useNativeDriver: true
         }).start(() => {
           setTimeout(() => {
-            navigation.replace('WorkoutSummary', {
-              routine,
-            });
+            navigation.replace("WorkoutSummary", { routine });
           }, 900);
         });
       }
@@ -82,140 +89,197 @@ export default function WorkoutFocusScreen() {
 
   const finishRest = () => {
     setCurrentSet(prev => prev + 1);
-    setPhase('set');
+    setPhase("set");
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: '#000',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 24,
-      }}
-    >
-      <Text style={{ color: '#fff', fontSize: 32, fontWeight: '700' }}>
-        {exerciseName}
-      </Text>
+    <View style={styles.container}>
+      {/* HEADER */}
+      <Text style={styles.exercise}>{exerciseName}</Text>
 
-      <Text style={{ color: '#888', fontSize: 18, marginTop: 8 }}>
-        Set {currentSet} / {totalSets}
-      </Text>
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>
+          SET {currentSet} / {totalSets}
+        </Text>
+      </View>
 
-      {phase === 'set' ? (
-        <>
-          <Text style={{ color: '#aaa', fontSize: 18, marginTop: 20 }}>
-            Reps objetivo
+      {/* TIMER CIRCLE */}
+      <View
+        style={[
+          styles.timerCircle,
+          phase === "rest" && { borderColor: "#F59E0B" }
+        ]}
+      >
+        <Text
+          style={[
+            styles.timer,
+            phase === "rest" && { color: "#F59E0B" }
+          ]}
+        >
+          {timer}s
+        </Text>
+        {phase === "set" && (
+          <Text style={styles.reps}>{repsTarget} reps</Text>
+        )}
+      </View>
+
+      {/* ACTION */}
+      {phase === "set" ? (
+        <TouchableOpacity
+          style={styles.primaryButton}
+          activeOpacity={0.9}
+          onPress={completeSet}
+        >
+          <Text style={styles.primaryButtonText}>
+            SET COMPLETED
           </Text>
-
-          <Text style={{ color: '#fff', fontSize: 36 }}>
-            {repsTarget}
-          </Text>
-
-          <Text
-            style={{
-              color: '#0f0',
-              fontSize: 52,
-              fontWeight: 'bold',
-              marginVertical: 40,
-            }}
-          >
-            {timer}s
-          </Text>
-
-          <TouchableOpacity
-            onPress={completeSet}
-            activeOpacity={0.85}
-            style={{
-              backgroundColor: '#0a7',
-              paddingVertical: 22,
-              paddingHorizontal: 50,
-              borderRadius: 999,
-            }}
-          >
-            <Text style={{ color: '#000', fontSize: 20, fontWeight: '700' }}>
-              ✅ Set completado
-            </Text>
-          </TouchableOpacity>
-        </>
+        </TouchableOpacity>
       ) : (
-        <>
-          <Text style={{ color: '#f90', fontSize: 20, marginTop: 30 }}>
-            Descanso
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          activeOpacity={0.9}
+          onPress={finishRest}
+        >
+          <Text style={styles.secondaryButtonText}>
+            CONTINUE ({restRecommended}s)
           </Text>
-
-          <Text
-            style={{
-              color: '#f90',
-              fontSize: 52,
-              fontWeight: 'bold',
-              marginVertical: 30,
-            }}
-          >
-            {timer}s
-          </Text>
-
-          <Text style={{ color: '#666', marginBottom: 20 }}>
-            Recomendado: {restRecommended}s
-          </Text>
-
-          <TouchableOpacity
-            onPress={finishRest}
-            activeOpacity={0.85}
-            style={{
-              backgroundColor: '#222',
-              paddingVertical: 16,
-              paddingHorizontal: 40,
-              borderRadius: 999,
-            }}
-          >
-            <Text style={{ color: '#fff', fontSize: 16 }}>
-              Continuar
-            </Text>
-          </TouchableOpacity>
-        </>
+        </TouchableOpacity>
       )}
 
-      {/* 🎬 OVERLAY FIN DE RUTINA */}
+      {/* FINISH OVERLAY */}
       {finished && (
         <Animated.View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: '#000',
-            justifyContent: 'center',
-            alignItems: 'center',
-            opacity: finishAnim,
-            transform: [
-              {
-                scale: finishAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.95, 1],
-                }),
-              },
-            ],
-          }}
+          style={[
+            styles.finishOverlay,
+            { opacity: finishAnim }
+          ]}
         >
-          <Text
-            style={{
-              color: '#0a7',
-              fontSize: 34,
-              fontWeight: '800',
-              marginBottom: 12,
-            }}
-          >
-            💪 Entrenamiento completado
+          <Text style={styles.finishTitle}>
+            WORKOUT COMPLETED
           </Text>
-
-          <Text style={{ color: '#666', fontSize: 16 }}>
-            Buen trabajo
+          <Text style={styles.finishSub}>
+            Strong session 💪
           </Text>
         </Animated.View>
       )}
     </View>
   );
 }
+
+/* =========================
+   STYLES
+========================= */
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#020617",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 60,
+    paddingHorizontal: 24
+  },
+
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#020617"
+  },
+
+  exercise: {
+    color: "#F8FAFC",
+    fontSize: 32,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+
+  badge: {
+    backgroundColor: "#020617",
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999
+  },
+
+  badgeText: {
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "700"
+  },
+
+  timerCircle: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 6,
+    borderColor: "#22C55E",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+
+  timer: {
+    color: "#22C55E",
+    fontSize: 56,
+    fontWeight: "800"
+  },
+
+  reps: {
+    color: "#94A3B8",
+    fontSize: 16,
+    marginTop: 4
+  },
+
+  primaryButton: {
+    backgroundColor: "#22C55E",
+    paddingVertical: 20,
+    paddingHorizontal: 60,
+    borderRadius: 999
+  },
+
+  primaryButtonText: {
+    color: "#052E16",
+    fontWeight: "800",
+    fontSize: 16,
+    letterSpacing: 1
+  },
+
+  secondaryButton: {
+    backgroundColor: "#020617",
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    paddingVertical: 18,
+    paddingHorizontal: 50,
+    borderRadius: 999
+  },
+
+  secondaryButtonText: {
+    color: "#F59E0B",
+    fontWeight: "700",
+    fontSize: 14
+  },
+
+  finishOverlay: {
+    position: "absolute",
+    inset: 0,
+    backgroundColor: "#020617",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+
+  finishTitle: {
+    color: "#22C55E",
+    fontSize: 34,
+    fontWeight: "900",
+    marginBottom: 8
+  },
+
+  finishSub: {
+    color: "#94A3B8",
+    fontSize: 16
+  },
+
+  textMuted: {
+    color: "#94A3B8"
+  }
+});

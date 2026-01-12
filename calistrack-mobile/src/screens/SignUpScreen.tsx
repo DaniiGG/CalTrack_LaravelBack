@@ -7,30 +7,59 @@ import {
   Alert,
   StyleSheet
 } from "react-native";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../services/auth";
+import { db } from "../../firebase"; // asegúrate de exportar firestore desde tu config
+import { doc, setDoc } from "firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 
-export default function LoginScreen() {
+export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [photoUrl, setPhotoUrl] = useState(""); // opcional, usuario puede subir foto
   const navigation = useNavigation<any>();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  const handleSignUp = async () => {
+    if (!email || !password || !name) {
       Alert.alert("Error", "Fill all fields");
       return;
     }
 
+    if (password.length < 6) {
+      Alert.alert(
+        "Weak password",
+        "Password must be at least 6 characters"
+      );
+      return;
+    }
+
     try {
-      const userCredential = await signInWithEmailAndPassword(
+      // 1️⃣ Crear usuario en Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-      console.log("Logged user:", userCredential.user.uid);
+
+      const uid = userCredential.user.uid;
+
+      // 2️⃣ Guardar perfil en Firestore
+      await setDoc(doc(db, "users", uid), {
+        name,
+        email,
+        photoUrl: photoUrl || null,
+        level: "basic", // nivel inicial
+        combosCompleted: 0,
+        streak: 0,
+        createdAt: new Date().toISOString()
+      });
+
+      console.log("User created and profile saved:", uid);
+
+      navigation.replace("WorkoutHome");
     } catch (error: any) {
-      Alert.alert("Login error", error.message);
+      Alert.alert("Sign up error", error.message);
     }
   };
 
@@ -38,14 +67,22 @@ export default function LoginScreen() {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.title}>Create account</Text>
         <Text style={styles.subtitle}>
-          Train. Improve. Repeat.
+          Start your calisthenics journey
         </Text>
       </View>
 
       {/* FORM */}
       <View style={styles.form}>
+        <TextInput
+          placeholder="Name"
+          placeholderTextColor="#64748B"
+          value={name}
+          onChangeText={setName}
+          style={styles.input}
+        />
+
         <TextInput
           placeholder="Email"
           placeholderTextColor="#64748B"
@@ -66,20 +103,18 @@ export default function LoginScreen() {
         />
 
         <Pressable
-          onPress={handleLogin}
-          style={styles.loginButton}
+          onPress={handleSignUp}
+          style={styles.signUpButton}
         >
-          <Text style={styles.loginButtonText}>
-            SIGN IN
-          </Text>
+          <Text style={styles.signUpButtonText}>SIGN UP</Text>
         </Pressable>
 
         <Pressable
-          onPress={() => navigation.navigate("SignUp")}
+          onPress={() => navigation.replace("Login")}
           style={styles.link}
         >
           <Text style={styles.linkText}>
-            Don’t have an account? Sign up
+            Already have an account? Sign in
           </Text>
         </Pressable>
       </View>
@@ -129,7 +164,7 @@ const styles = StyleSheet.create({
     borderColor: "#1E293B"
   },
 
-  loginButton: {
+  signUpButton: {
     backgroundColor: "#22C55E",
     paddingVertical: 16,
     borderRadius: 16,
@@ -137,7 +172,7 @@ const styles = StyleSheet.create({
     marginTop: 10
   },
 
-  loginButtonText: {
+  signUpButtonText: {
     color: "#052E16",
     fontWeight: "800",
     fontSize: 14,
