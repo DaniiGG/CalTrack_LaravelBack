@@ -3,8 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HomeStack from "./HomeStack";
-import GameScreen from "../screens/ComboGameScreen";
-import HistoryScreen from "../screens/HistoryScreen";
+import GameStack from "./GameStack";
+import RoutinesStack from "./RoutinesStack";
 import UserStack from "./UserStack";
 
 const Tab = createBottomTabNavigator();
@@ -43,7 +43,7 @@ export default function TabsNavigator() {
             case "Game":
               iconName = "flash-outline";
               break;
-            case "History":
+            case "Routines":
               iconName = "time-outline";
               break;
             case "Settings":
@@ -64,8 +64,8 @@ export default function TabsNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={HomeStack} />
-      <Tab.Screen name="Game" component={GameScreen} />
-      <Tab.Screen name="History" component={HistoryScreen} />
+      <Tab.Screen name="Game" component={GameStack} />
+      <Tab.Screen name="Routines" component={RoutinesStack} />
       <Tab.Screen name="You" component={UserStack} />
     </Tab.Navigator>
   );

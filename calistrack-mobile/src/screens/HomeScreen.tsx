@@ -1,139 +1,190 @@
-import { View, Text, FlatList, Pressable, ActivityIndicator } from 'react-native';
-import { useEffect, useState, useCallback } from 'react';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
-
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+import { useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
 import { auth, db } from '../../firebase';
-import { useAuth } from '../context/AuthContext';
-
-type Routine = {
-  id: string;
-  name: string;
-  description?: string;
-  level: string;
-};
 
 export default function HomeScreen() {
-  const [routines, setRoutines] = useState<Routine[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigation = useNavigation<any>();
-  const { logout } = useAuth();
+  const user = auth.currentUser;
 
-  const loadRoutines = async () => {
-    if (!auth.currentUser) return;
+  const today = new Date().toISOString().split('T')[0];
 
-    try {
+  const [todayWorkout, setTodayWorkout] = useState<any>(null);
+  const [streak, setStreak] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const load = async () => {
       setLoading(true);
 
       const q = query(
-        collection(db, 'routines'),
-        where('userId', '==', auth.currentUser.uid)
+        collection(db, 'workouts'),
+        where('userId', '==', user.uid)
       );
 
-      const snapshot = await getDocs(q);
+      const snap = await getDocs(q);
+      const workouts = snap.docs.map(d => d.data());
 
-      const data: Routine[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Routine, 'id'>),
-      }));
+      setTodayWorkout(workouts.find(w => w.date === today));
+      setStreak(workouts.filter(w => w.completed).length);
 
-      setRoutines(data);
-    } catch (error) {
-      console.log('Error cargando rutinas:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+    };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadRoutines();
-    }, [])
-  );
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    logout(); // limpia estado global
-  };
+    load();
+  }, []);
 
   if (loading) {
-    return <ActivityIndicator style={{ marginTop: 50 }} />;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#22C55E" />
+      </View>
+    );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f9f9f9', padding: 16 }}>
-      {/* Crear rutina */}
+    <View style={styles.container}>
+      {/* HEADER */}
+      <Text style={styles.greeting}>👋 Hola</Text>
+      <Text style={styles.subtitle}>Hoy toca moverse</Text>
+
+      {/* CTA */}
       <Pressable
-        onPress={() => navigation.navigate('CreateRoutine')}
-        style={{
-          backgroundColor: '#0a7',
-          padding: 14,
-          borderRadius: 8,
-          alignItems: 'center',
-          marginBottom: 16,
+        style={styles.mainButton}
+        onPress={() => {
+          if (todayWorkout) {
+            navigation.navigate('WorkoutFocus', {
+              workout: todayWorkout,
+            });
+          } else {
+            navigation.navigate('Calendar');
+          }
         }}
       >
-        <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-          + Nueva Rutina
+        <Text style={styles.mainButtonText}>
+          {todayWorkout
+            ? '▶️ Empezar entrenamiento'
+            : '📅 Programar entreno'}
         </Text>
       </Pressable>
 
-      <Text style={{ fontSize: 28, fontWeight: 'bold', marginBottom: 16 }}>
-        Mis Rutinas 💪
-      </Text>
+      {/* INFO HOY */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Hoy</Text>
 
-      {/* Lista de rutinas */}
-      <FlatList
-        data={routines}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text style={{ color: '#666', textAlign: 'center', marginTop: 40 }}>
-            Aún no tienes rutinas creadas
+        {todayWorkout ? (
+          <Text style={styles.cardValue}>
+            {todayWorkout.routineName}
           </Text>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() =>
-              navigation.navigate('RoutineDetail', { routineId: item.id })
-            }
-            style={{
-              backgroundColor: '#fff',
-              padding: 16,
-              borderRadius: 10,
-              marginBottom: 12,
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>
-              {item.name}
-            </Text>
-
-            {item.description ? (
-              <Text style={{ color: '#666', marginTop: 4 }}>
-                {item.description}
-              </Text>
-            ) : null}
-
-            <Text style={{ marginTop: 8, fontStyle: 'italic' }}>
-              Nivel: {item.level}
-            </Text>
-          </Pressable>
+        ) : (
+          <Text style={styles.muted}>
+            No hay entreno programado
+          </Text>
         )}
-      />
+      </View>
 
-      {/* Logout */}
+      {/* STREAK */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Racha</Text>
+        <Text style={styles.cardValue}>🔥 {streak} entrenos</Text>
+      </View>
+
       <Pressable
-        onPress={handleLogout}
-        style={{
-          backgroundColor: '#111',
-          padding: 14,
-          borderRadius: 8,
-          alignItems: 'center',
-          marginTop: 12,
-        }}
+        style={styles.secondaryButton}
+        onPress={() => navigation.navigate('CreateRoutine')}
       >
-        <Text style={{ color: '#fff' }}>Logout</Text>
+        <Text style={styles.secondaryText}>
+          📅 Crear rutina
+        </Text>
+      </Pressable>
+
+      {/* CALENDAR NAV */}
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={() => navigation.navigate('Calendar')}
+      >
+        <Text style={styles.secondaryText}>
+          📅 Ver calendario
+        </Text>
       </Pressable>
     </View>
   );
 }
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#020617',
+    padding: 20,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: '#020617',
+  },
+  greeting: {
+    color: '#F8FAFC',
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  subtitle: {
+    color: '#94A3B8',
+    marginBottom: 20,
+  },
+  mainButton: {
+    backgroundColor: '#22C55E',
+    padding: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  mainButtonText: {
+    color: '#022C22',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  cardTitle: {
+    color: '#94A3B8',
+    marginBottom: 6,
+  },
+  cardValue: {
+    color: '#F8FAFC',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  muted: {
+    color: '#64748B',
+  },
+  secondaryButton: {
+    marginTop: 'auto',
+    borderWidth: 1,
+    borderColor: '#22C55E',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+  },
+  secondaryText: {
+    color: '#22C55E',
+    fontWeight: '700',
+  },
+});

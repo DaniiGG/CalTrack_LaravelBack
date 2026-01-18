@@ -71,7 +71,7 @@ export const exercises: Exercise[] = [
   
 
   {
-    id: "pullups",
+    id: "archer_pullups",
     name: "Archer Pull Ups",
     level: "intermediate",
     repMin: 2,

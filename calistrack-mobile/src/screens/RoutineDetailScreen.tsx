@@ -1,15 +1,22 @@
-import { View, Text, Pressable, Alert, FlatList, Image, Modal, TextInput } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { useEffect, useState, useMemo } from 'react';
 import {
-  doc,
-  onSnapshot,
-  deleteDoc,
-  getDocs,
-  collection,
-} from 'firebase/firestore';
-import { db } from '../../firebase';
-import { updateDoc } from 'firebase/firestore';
+  View,
+  Text,
+  Pressable,
+  Alert,
+  FlatList,
+  Modal,
+  TextInput,
+  StyleSheet,
+} from "react-native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { useEffect, useState, useMemo } from "react";
+import { doc, onSnapshot, deleteDoc, updateDoc } from "firebase/firestore";
+import { db } from "../../firebase";
+import { exercises as BASE_EXERCISES } from "../data/exercises";
+
+const EXERCISE_MAP = Object.fromEntries(
+  BASE_EXERCISES.map(e => [e.id, e])
+);
 
 export default function RoutineDetailScreen() {
   const navigation = useNavigation<any>();
@@ -22,14 +29,42 @@ export default function RoutineDetailScreen() {
   const [editModal, setEditModal] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const [editSets, setEditSets] = useState('');
-  const [editReps, setEditReps] = useState('');
-  const [editRest, setEditRest] = useState('');
+  const [editSets, setEditSets] = useState("");
+  const [editReps, setEditReps] = useState("");
+  const [editRest, setEditRest] = useState("");
 
-  // 🔥 ejercicios globales por id
-  const [globalExercises, setGlobalExercises] = useState<Record<string, any>>(
-    {}
-  );
+  /* 🔥 ESCUCHAR RUTINA */
+  useEffect(() => {
+    const ref = doc(db, "routines", routineId);
+    const unsub = onSnapshot(ref, snap => {
+      setRoutine(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+      setLoading(false);
+    });
+    return unsub;
+  }, [routineId]);
+
+  /* 🔗 JOIN LOCAL */
+  const enrichedExercises = useMemo(() => {
+    if (!routine?.exercises) return [];
+
+    return routine.exercises.map((item: any) => {
+      if (item.type === "base") {
+        return {
+          ...item,
+          exercise: EXERCISE_MAP[item.exerciseId],
+        };
+      }
+
+      return {
+        ...item,
+        exercise: {
+          name: item.name,
+          muscle_group: item.muscle_group,
+        },
+      };
+    });
+  }, [routine?.exercises]);
+
   const openEdit = (item: any, index: number) => {
     setEditingIndex(index);
     setEditSets(String(item.sets));
@@ -41,351 +76,285 @@ export default function RoutineDetailScreen() {
   const saveEdit = async () => {
     if (editingIndex === null) return;
 
-    const updatedExercises = [...routine.exercises];
-
-    updatedExercises[editingIndex] = {
-      ...updatedExercises[editingIndex],
+    const updated = [...routine.exercises];
+    updated[editingIndex] = {
+      ...updated[editingIndex],
       sets: Number(editSets),
       reps: Number(editReps),
       rest_seconds: Number(editRest),
     };
 
-    await updateDoc(doc(db, 'routines', routineId), {
-      exercises: updatedExercises,
+    await updateDoc(doc(db, "routines", routineId), {
+      exercises: updated,
     });
 
     setEditModal(false);
   };
 
-  // 🔥 cargar ejercicios globales una vez
-  useEffect(() => {
-    const loadGlobalExercises = async () => {
-      const snap = await getDocs(collection(db, 'exercises'));
-      const map: Record<string, any> = {};
-
-      snap.docs.forEach(d => {
-        map[d.id] = d.data();
-      });
-
-      setGlobalExercises(map);
-    };
-
-    loadGlobalExercises();
-  }, []);
-
-  // 🔥 escuchar rutina en tiempo real
-  useEffect(() => {
-    if (!routineId) return;
-
-    const ref = doc(db, 'routines', routineId);
-
-    const unsubscribe = onSnapshot(ref, snapshot => {
-      if (snapshot.exists()) {
-        setRoutine({ id: snapshot.id, ...snapshot.data() });
-      } else {
-        setRoutine(null);
-      }
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, [routineId]);
-
   const deleteRoutine = () => {
-    Alert.alert('Eliminar rutina', '¿Seguro que quieres eliminar esta rutina?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert("Eliminar rutina", "¿Seguro?", [
+      { text: "Cancelar", style: "cancel" },
       {
-        text: 'Eliminar',
-        style: 'destructive',
+        text: "Eliminar",
+        style: "destructive",
         onPress: async () => {
-          await deleteDoc(doc(db, 'routines', routineId));
+          await deleteDoc(doc(db, "routines", routineId));
           navigation.goBack();
         },
       },
     ]);
   };
 
-  // 🔥 ejercicios enriquecidos (JOIN manual)
-  const enrichedExercises = useMemo(() => {
-    if (!routine?.exercises) return [];
-
-    return routine.exercises.map((item: any) => {
-      if (item.type === 'global') {
-        return {
-          ...item,
-          exercise: globalExercises[item.exerciseId],
-        };
-      }
-
-      // custom
-      return {
-        ...item,
-        exercise: {
-          name: item.name,
-          muscle_group: item.muscle_group,
-          image_url: item.image_url,
-        },
-      };
-    });
-  }, [routine?.exercises, globalExercises]);
-
-  if (loading) {
+  if (loading || !routine) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Cargando rutina...</Text>
+      <View style={styles.center}>
+        <Text style={{ color: "#94A3B8" }}>Cargando rutina...</Text>
       </View>
     );
   }
-
-  if (!routine) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>No se pudo cargar la rutina</Text>
-      </View>
-    );
-  }
-
-
 
   return (
-    <><Modal visible={editModal} animationType="slide" transparent>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.4)',
-          justifyContent: 'center',
-          padding: 20,
-        }}
-      >
-        <View
-          style={{
-            backgroundColor: '#fff',
-            borderRadius: 16,
-            padding: 20,
-          }}
-        >
-          <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>
-            Editar ejercicio
-          </Text>
+    <View style={styles.container}>
+      {/* HEADER */}
+      <Text style={styles.title}>{routine.name}</Text>
+      {routine.description && (
+        <Text style={styles.desc}>{routine.description}</Text>
+      )}
+      <Text style={styles.level}>Nivel: {routine.level}</Text>
 
-          <TextInput
-            placeholder="Series"
-            value={editSets}
-            onChangeText={setEditSets}
-            keyboardType="numeric"
-            style={{
-              borderWidth: 1,
-              borderColor: '#ddd',
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 10,
-            }}
-          />
+      {/* EJERCICIOS */}
+      <FlatList
+        data={enrichedExercises}
+        keyExtractor={(_, i) => i.toString()}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        renderItem={({ item, index }) => (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>
+                {item.exercise?.name ?? "Ejercicio"}
+              </Text>
 
-          <TextInput
-            placeholder="Reps"
-            value={editReps}
-            onChangeText={setEditReps}
-            keyboardType="numeric"
-            style={{
-              borderWidth: 1,
-              borderColor: '#ddd',
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 10,
-            }}
-          />
-
-          <TextInput
-            placeholder="Descanso (s)"
-            value={editRest}
-            onChangeText={setEditRest}
-            keyboardType="numeric"
-            style={{
-              borderWidth: 1,
-              borderColor: '#ddd',
-              borderRadius: 10,
-              padding: 12,
-              marginBottom: 10,
-            }}
-          />
-
-          <Pressable
-            onPress={saveEdit}
-            style={{
-              backgroundColor: '#0a7',
-              padding: 14,
-              borderRadius: 10,
-              marginTop: 10,
-            }}
-          >
-            <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>
-              Guardar cambios
-            </Text>
-          </Pressable>
-
-          <Pressable onPress={() => setEditModal(false)}>
-            <Text style={{ textAlign: 'center', marginTop: 10 }}>
-              Cancelar
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-      <View style={{ flex: 1, padding: 20, backgroundColor: '#f9f9f9' }}>
-        <Text style={{ fontSize: 30, fontWeight: 'bold', marginBottom: 8 }}>
-          {routine.name}
-        </Text>
-
-        {routine.description && (
-          <Text style={{ fontSize: 16, color: '#666', marginBottom: 8 }}>
-            {routine.description}
-          </Text>
-        )}
-
-        <Text style={{ fontStyle: 'italic', marginBottom: 20 }}>
-          Nivel: {routine.level}
-        </Text>
-
-        <FlatList
-          data={enrichedExercises}
-          keyExtractor={(_, index) => index.toString()}
-          renderItem={({ item, index }) => (
-            <View style={cardStyle}>
-              <View style={cardHeader}>
-                <Text style={cardTitle}>
-                  {item.exercise?.name ?? 'Ejercicio'}
-                </Text>
-
-                <Pressable onPress={() => openEdit(item, index)}>
-                  <Text style={{ fontSize: 18 }}>✏️</Text>
-                </Pressable>
-              </View>
-
-              <View style={statsRow}>
-                <Text style={statText}>Series: {item.sets}</Text>
-                <Text style={statText}>Reps: {item.reps}</Text>
-                <Text style={statText}>
-                  Descanso: {item.rest_seconds}s
-                </Text>
-              </View>
-
-              {item.exercise?.image_url && (
-                <Image
-                  source={{ uri: item.exercise.image_url }}
-                  style={imageStyle}
-                />
-              )}
+              <Pressable onPress={() => openEdit(item, index)}>
+                <Text style={{ fontSize: 18 }}>✏️</Text>
+              </Pressable>
             </View>
-          )}
-        />
 
-        {/* ▶️ ENTRENAR */}
-        <Pressable
-          onPress={() =>
-            navigation.navigate('WorkoutFocus', {
-              routine: {
-                ...routine,
-                exercises: enrichedExercises, 
-              },
-            })
-          }
-          style={{
-            backgroundColor: '#0a7',
-            padding: 16,
-            borderRadius: 12,
-            alignItems: 'center',
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
-            ▶️ Empezar entrenamiento
-          </Text>
-        </Pressable>
+            <View style={styles.statsRow}>
+              <Text style={styles.stat}>Series: {item.sets}</Text>
+              <Text style={styles.stat}>Reps: {item.reps}</Text>
+              <Text style={styles.stat}>
+                Descanso: {item.rest_seconds}s
+              </Text>
+            </View>
+          </View>
+        )}
+      />
 
-        {/* ➕ AÑADIR EJERCICIO */}
-        <Pressable
-          onPress={() =>
-            navigation.navigate('AddRoutineExercise', { routineId: routine.id })
-          }
-          style={{
-            backgroundColor: '#111',
-            padding: 14,
-            borderRadius: 8,
-            marginBottom: 12,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-            + Añadir ejercicio
-          </Text>
-        </Pressable>
+      {/* ACCIONES */}
+      <Pressable
+        style={styles.primary}
+        onPress={() =>
+          navigation.navigate("WorkoutFocus", {
+            routine: { ...routine, exercises: enrichedExercises },
+          })
+        }
+      >
+        <Text style={styles.primaryText}>▶️ Empezar entrenamiento</Text>
+      </Pressable>
 
-        {/* 🗑️ ELIMINAR */}
-        <Pressable
-          onPress={deleteRoutine}
-          style={{
-            backgroundColor: '#c00',
-            padding: 16,
-            borderRadius: 8,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-            Eliminar Rutina
-          </Text>
-        </Pressable>
-      </View>
-    </>
+      <Pressable
+        style={styles.secondary}
+        onPress={() =>
+          navigation.navigate("AddRoutineExercise", { routineId })
+        }
+      >
+        <Text style={styles.secondaryText}>+ Añadir ejercicio</Text>
+      </Pressable>
+
+      <Pressable style={styles.danger} onPress={deleteRoutine}>
+        <Text style={styles.dangerText}>Eliminar rutina</Text>
+      </Pressable>
+
+      {/* MODAL EDIT */}
+      <Modal visible={editModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Editar ejercicio</Text>
+
+            <TextInput
+              placeholder="Series"
+              value={editSets}
+              onChangeText={setEditSets}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Reps"
+              value={editReps}
+              onChangeText={setEditReps}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Descanso (s)"
+              value={editRest}
+              onChangeText={setEditRest}
+              keyboardType="numeric"
+              style={styles.input}
+            />
+
+            <Pressable style={styles.primary} onPress={saveEdit}>
+              <Text style={styles.primaryText}>Guardar cambios</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setEditModal(false)}>
+              <Text style={styles.cancel}>Cancelar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
-
-
 }
-const inputStyle = {
-  borderWidth: 1,
-  borderColor: '#ddd',
-  borderRadius: 10,
-  padding: 12,
-  marginBottom: 10,
-};
 
-const cardStyle = {
-  backgroundColor: '#fff',
-  borderRadius: 16,
-  padding: 16,
-  marginBottom: 14,
-  shadowColor: '#000',
-  shadowOpacity: 0.05,
-  shadowRadius: 8,
-  elevation: 3,
-};
+/* =========================
+   STYLES
+========================= */
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0F172A",
+    padding: 16,
+  },
 
-const cardHeader = {
-  flexDirection: 'row' as const,
-  justifyContent: 'space-between' as const,
-  alignItems: 'center' as const,
-};
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#0F172A",
+  },
 
-const cardTitle = {
-  fontSize: 18,
-  fontWeight: '700' as const,
-};
+  title: {
+    color: "#F8FAFC",
+    fontSize: 28,
+    fontWeight: "900",
+  },
 
-const statsRow = {
-  flexDirection: 'row' as const,
-  justifyContent: 'space-between' as const,
-  marginTop: 10,
-};
+  desc: {
+    color: "#94A3B8",
+    marginTop: 6,
+  },
 
-const statText = {
-  color: '#555',
-};
+  level: {
+    color: "#64748B",
+    fontStyle: "italic",
+    marginBottom: 20,
+  },
 
-const imageStyle = {
-  width: '100%' as const,
-  height: 140,
-  borderRadius: 12,
-  marginTop: 12,
-};
+  card: {
+    backgroundColor: "#020617",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+  },
 
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
 
+  cardTitle: {
+    color: "#F8FAFC",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+
+  stat: {
+    color: "#94A3B8",
+    fontSize: 12,
+  },
+
+  primary: {
+    backgroundColor: "#22C55E",
+    padding: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  primaryText: {
+    color: "#052E16",
+    fontWeight: "900",
+  },
+
+  secondary: {
+    backgroundColor: "#020617",
+    padding: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    marginBottom: 10,
+  },
+
+  secondaryText: {
+    color: "#F8FAFC",
+    fontWeight: "700",
+  },
+
+  danger: {
+    backgroundColor: "#7F1D1D",
+    padding: 16,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+
+  dangerText: {
+    color: "#FECACA",
+    fontWeight: "900",
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    padding: 20,
+  },
+
+  modal: {
+    backgroundColor: "#020617",
+    borderRadius: 16,
+    padding: 20,
+  },
+
+  modalTitle: {
+    color: "#F8FAFC",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 12,
+  },
+
+  input: {
+    backgroundColor: "#0F172A",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    color: "#F8FAFC",
+    marginBottom: 10,
+  },
+
+  cancel: {
+    color: "#94A3B8",
+    textAlign: "center",
+    marginTop: 10,
+  },
+});
