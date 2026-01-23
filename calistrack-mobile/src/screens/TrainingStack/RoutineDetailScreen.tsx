@@ -11,8 +11,8 @@ import {
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState, useMemo } from "react";
 import { doc, onSnapshot, deleteDoc, updateDoc } from "firebase/firestore";
-import { db } from "../../firebase";
-import { exercises as BASE_EXERCISES } from "../data/exercises";
+import { db } from "../../../firebase";
+import { exercises as BASE_EXERCISES } from "../../data/exercises";
 
 const EXERCISE_MAP = Object.fromEntries(
   BASE_EXERCISES.map(e => [e.id, e])

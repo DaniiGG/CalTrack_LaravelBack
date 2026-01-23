@@ -12,9 +12,9 @@ import {
 } from "react-native";
 import { useState, useMemo } from "react";
 import { doc, updateDoc, arrayUnion } from "firebase/firestore";
-import { db } from "../../firebase";
+import { db } from "../../../firebase";
 import { useRoute, useNavigation } from "@react-navigation/native";
-import { exercises as BASE_EXERCISES } from "../data/exercises";
+import { exercises as BASE_EXERCISES } from "../../data/exercises";
 
 export default function AddRoutineExerciseScreen() {
   const route = useRoute<any>();

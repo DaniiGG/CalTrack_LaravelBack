@@ -5,12 +5,13 @@ import {
   Pressable,
   ActivityIndicator,
   StyleSheet,
-} from 'react-native';
-import { useCallback, useState } from 'react';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+} from "react-native";
+import { useCallback, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
 
-import { auth, db } from '../../firebase';
+import { auth, db } from "../../../firebase";
 
 type Routine = {
   id: string;
@@ -31,20 +32,20 @@ export default function MyRoutinesScreen() {
       setLoading(true);
 
       const q = query(
-        collection(db, 'routines'),
-        where('userId', '==', auth.currentUser.uid)
+        collection(db, "routines"),
+        where("userId", "==", auth.currentUser.uid)
       );
 
       const snapshot = await getDocs(q);
 
       const data: Routine[] = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...(doc.data() as Omit<Routine, 'id'>),
+        ...(doc.data() as Omit<Routine, "id">),
       }));
 
       setRoutines(data);
     } catch (e) {
-      console.log('Error cargando rutinas', e);
+      console.log("Error cargando rutinas", e);
     } finally {
       setLoading(false);
     }
@@ -67,17 +68,37 @@ export default function MyRoutinesScreen() {
   return (
     <View style={styles.container}>
       {/* HEADER */}
+      <Text style={styles.screenTitle}>Entrenamiento</Text>
+
+      {/* TOOLS */}
+      <Pressable
+        style={styles.toolCard}
+        onPress={() => navigation.navigate("ConfigTimer")}
+      >
+        <Ionicons
+          name="stopwatch-outline"
+          size={26}
+          color="#22C55E"
+        />
+        <View>
+          <Text style={styles.toolTitle}>Cronómetro</Text>
+          <Text style={styles.toolSubtitle}>
+            Series, EMOM, descansos
+          </Text>
+        </View>
+      </Pressable>
+
+      {/* SECCIÓN RUTINAS */}
       <View style={styles.header}>
         <Text style={styles.title}>Mis Rutinas</Text>
         <Pressable
           style={styles.createButton}
-          onPress={() => navigation.navigate('CreateRoutine')}
+          onPress={() => navigation.navigate("CreateRoutine")}
         >
           <Text style={styles.createButtonText}>+ Nueva</Text>
         </Pressable>
       </View>
 
-      {/* LISTA */}
       <FlatList
         data={routines}
         keyExtractor={item => item.id}
@@ -89,7 +110,9 @@ export default function MyRoutinesScreen() {
             </Text>
             <Pressable
               style={styles.emptyButton}
-              onPress={() => navigation.navigate('CreateRoutine')}
+              onPress={() =>
+                navigation.navigate("CreateRoutine")
+              }
             >
               <Text style={styles.emptyButtonText}>
                 Crear mi primera rutina
@@ -101,7 +124,7 @@ export default function MyRoutinesScreen() {
           <Pressable
             style={styles.card}
             onPress={() =>
-              navigation.navigate('RoutineDetail', {
+              navigation.navigate("RoutineDetail", {
                 routineId: item.id,
               })
             }
@@ -127,80 +150,107 @@ export default function MyRoutinesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: "#020617",
     padding: 20,
   },
   center: {
     flex: 1,
-    backgroundColor: '#020617',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#020617",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  /* HEADER */
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  screenTitle: {
+    color: "#F8FAFC",
+    fontSize: 30,
+    fontWeight: "800",
     marginBottom: 20,
   },
+
+  /* TOOL */
+  toolCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    padding: 18,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#1E293B",
+    marginBottom: 24,
+  },
+  toolTitle: {
+    color: "#F8FAFC",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  toolSubtitle: {
+    color: "#94A3B8",
+    marginTop: 2,
+  },
+
+  /* HEADER RUTINAS */
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   title: {
-    color: '#F8FAFC',
-    fontSize: 28,
-    fontWeight: '800',
+    color: "#F8FAFC",
+    fontSize: 24,
+    fontWeight: "800",
   },
   createButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: "#22C55E",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
   },
   createButtonText: {
-    color: '#022C22',
-    fontWeight: '700',
+    color: "#022C22",
+    fontWeight: "700",
   },
 
   /* CARD */
   card: {
-    backgroundColor: '#020617',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: "#1E293B",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
   },
   cardTitle: {
-    color: '#F8FAFC',
+    color: "#F8FAFC",
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   cardDescription: {
-    color: '#94A3B8',
+    color: "#94A3B8",
     marginTop: 6,
   },
   cardLevel: {
-    color: '#64748B',
+    color: "#64748B",
     marginTop: 8,
-    fontStyle: 'italic',
+    fontStyle: "italic",
   },
 
   /* EMPTY */
   empty: {
-    alignItems: 'center',
-    marginTop: 80,
+    alignItems: "center",
+    marginTop: 60,
   },
   emptyText: {
-    color: '#64748B',
+    color: "#64748B",
     marginBottom: 16,
   },
   emptyButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: "#22C55E",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
   },
   emptyButtonText: {
-    color: '#022C22',
-    fontWeight: '700',
+    color: "#022C22",
+    fontWeight: "700",
   },
 });

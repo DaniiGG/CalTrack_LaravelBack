@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HomeStack from "./HomeStack";
 import GameStack from "./GameStack";
-import RoutinesStack from "./RoutinesStack";
+import RoutinesStack from "./TrainingStack";
 import UserStack from "./UserStack";
 
 const Tab = createBottomTabNavigator();
@@ -43,10 +43,10 @@ export default function TabsNavigator() {
             case "Game":
               iconName = "flash-outline";
               break;
-            case "Routines":
-              iconName = "time-outline";
+            case "Training":
+              iconName = "barbell-outline";
               break;
-            case "Settings":
+            case "You":
               iconName = "settings-outline";
               break;
             default:
@@ -65,7 +65,7 @@ export default function TabsNavigator() {
     >
       <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Game" component={GameStack} />
-      <Tab.Screen name="Routines" component={RoutinesStack} />
+      <Tab.Screen name="Training" component={RoutinesStack} />
       <Tab.Screen name="You" component={UserStack} />
     </Tab.Navigator>
   );

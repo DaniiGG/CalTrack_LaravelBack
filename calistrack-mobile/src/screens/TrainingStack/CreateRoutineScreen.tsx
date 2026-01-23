@@ -2,7 +2,7 @@ import { View, Text, TextInput, Pressable, Alert, StyleSheet } from 'react-nativ
 import { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../../firebase';
+import { auth, db } from '../../../firebase';
 
 type Level = 'beginner' | 'intermediate' | 'advanced';
 
